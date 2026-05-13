@@ -54,6 +54,12 @@ THIINGS_API_URL=...              # self-hosted thiings catalog
 THIINGS_API_KEY=...              # bearer for the thiings API
 OPENROUTER_API_KEY=sk-or-...     # optional — enables AI version-release lookup
 OPENROUTER_MODEL=openai/gpt-5-mini  # optional override; e.g. google/gemini-2.5-flash
+AUTH_PASSWORD=<your-password>    # set to gate the app behind a login form
+SESSION_SECRET=<32+ random bytes># optional; derived from AUTH_PASSWORD when unset
 ```
 
-All keys are optional; the app gracefully degrades (letter-monogram logos, no thiings icons, no AI lookup) when any are missing.
+All keys are optional; the app gracefully degrades (letter-monogram logos, no thiings icons, no AI lookup) when any are missing. **`AUTH_PASSWORD` is the one to set on Hostinger** — without it the app is open. Generate a `SESSION_SECRET` with:
+
+```bash
+node -e "console.log(require('crypto').randomBytes(32).toString('base64url'))"
+```

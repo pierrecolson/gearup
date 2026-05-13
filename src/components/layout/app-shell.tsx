@@ -1,6 +1,7 @@
 "use client";
 
 import { Suspense, useState } from "react";
+import { usePathname } from "next/navigation";
 import { List } from "@phosphor-icons/react/ssr";
 import { buttonVariants } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTrigger, SheetTitle } from "@/components/ui/sheet";
@@ -8,6 +9,7 @@ import { SidebarNav } from "./sidebar-nav";
 import { BrandMark } from "./brand-mark";
 import { ThemeToggle } from "./theme-toggle";
 import { DevicePanel } from "@/components/devices/device-panel";
+import { SignOutButton } from "@/components/login/sign-out-button";
 import type { CategoryDef } from "@/lib/categories";
 
 export function AppShell({
@@ -20,6 +22,10 @@ export function AppShell({
   children: React.ReactNode;
 }) {
   const [open, setOpen] = useState(false);
+  const pathname = usePathname();
+
+  // Skip the chrome on auth pages — login renders standalone, centered.
+  if (pathname === "/login") return <>{children}</>;
 
   return (
     <div className="flex min-h-screen bg-background">
@@ -31,7 +37,10 @@ export function AppShell({
         </div>
         <div className="p-3 border-t border-border/60 flex items-center justify-between">
           <span className="text-xs text-muted-foreground">v0.1.0</span>
-          <ThemeToggle />
+          <div className="flex items-center gap-1">
+            <ThemeToggle />
+            <SignOutButton />
+          </div>
         </div>
       </aside>
 
@@ -56,7 +65,10 @@ export function AppShell({
             </SheetContent>
           </Sheet>
           <BrandMark />
-          <ThemeToggle />
+          <div className="flex items-center gap-1">
+            <ThemeToggle />
+            <SignOutButton />
+          </div>
         </header>
 
         <main className="flex-1 overflow-x-hidden">{children}</main>
