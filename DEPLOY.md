@@ -1,131 +1,127 @@
-# Deploying GearUp to a VPS
+# Deploying GearUp to a VPS (Docker)
 
-Target: fresh Ubuntu 24.04 (Hostinger KVM2 or similar). One-time bootstrap, then auto-deploy on every push to `main` via GitHub Actions.
+Target: Ubuntu 24.04 with Docker already installed (Hostinger KVM2 or similar).
+One-time bootstrap, then auto-deploy on every push to `main` via GitHub Actions.
 
 ## One-time VPS setup
 
-SSH in as **root** and copy-paste these blocks. Replace `<DOMAIN>` and `<YOUR_SSH_PUBKEY>` where prompted.
+SSH in as **root** and copy-paste these blocks. Replace `<YOUR_SSH_PUBKEY>` and
+`<DOMAIN>` where prompted.
 
-### 1. System packages
+### 1. Docker + compose plugin (skip if already installed)
 
 ```bash
-apt update && apt upgrade -y
-curl -fsSL https://deb.nodesource.com/setup_22.x | bash -
-apt install -y nodejs nginx certbot python3-certbot-nginx ufw git
-npm install -g pm2
+docker --version || curl -fsSL https://get.docker.com | sh
+docker compose version || apt install -y docker-compose-plugin
 ```
 
 ### 2. Deploy user (so GitHub Actions doesn't SSH as root)
 
 ```bash
 adduser --disabled-password --gecos "" deploy
-usermod -aG sudo deploy
+usermod -aG sudo,docker deploy
 
-# Paste the PUBLIC half of your deploy key here. Generate one with:
+# Paste the PUBLIC half of your deploy key. Generate locally with:
 #   ssh-keygen -t ed25519 -C "gearup-deploy" -f ~/.ssh/gearup_deploy
-# Use the *public* key (.pub) below, store the *private* key in GitHub Secrets.
 mkdir -p /home/deploy/.ssh
 echo "<YOUR_SSH_PUBKEY>" > /home/deploy/.ssh/authorized_keys
 chown -R deploy:deploy /home/deploy/.ssh
 chmod 700 /home/deploy/.ssh
 chmod 600 /home/deploy/.ssh/authorized_keys
-
-# Let `deploy` run pm2 + reload nginx without password prompts.
-echo "deploy ALL=(ALL) NOPASSWD: /bin/systemctl reload nginx" > /etc/sudoers.d/deploy
-chmod 440 /etc/sudoers.d/deploy
 ```
 
-### 3. Firewall
+### 3. Firewall (skip if already configured)
 
 ```bash
 ufw allow OpenSSH
-ufw allow "Nginx Full"
+ufw allow 80/tcp
+ufw allow 443/tcp
 ufw --force enable
 ```
 
-### 4. Clone the repo and seed env
+### 4. Clone the repo + create production env
 
 ```bash
 mkdir -p /var/www
 git clone https://github.com/pierrecolson/gearup.git /var/www/gearup
 chown -R deploy:deploy /var/www/gearup
+```
 
-# Production env. Generate fresh values — rotate any keys that were pasted in chat.
+Create `/var/www/gearup/.env.local` with your production values — **rotate any
+key that was pasted in chat** before putting it here:
+
+```bash
 cat > /var/www/gearup/.env.local <<'EOF'
 NEXT_PUBLIC_LOGODEV_KEY=pk_...
 THIINGS_API_URL=http://76.13.181.11:3088
 THIINGS_API_KEY=<rotated>
 OPENROUTER_API_KEY=<rotated>
 # OPENROUTER_MODEL=openai/gpt-5-mini   # optional override
-
 AUTH_PASSWORD=<your real password>
 SESSION_SECRET=<run: node -e "console.log(require('crypto').randomBytes(32).toString('base64url'))">
-
-NODE_ENV=production
 EOF
 chmod 600 /var/www/gearup/.env.local
 chown deploy:deploy /var/www/gearup/.env.local
 ```
 
-### 5. First build + start the process
-
-```bash
-sudo -u deploy bash <<'EOF'
-cd /var/www/gearup
-npm ci --no-audit --no-fund
-npm run build
-pm2 start npm --name gearup -- start
-pm2 save
-EOF
-
-# Make pm2 survive reboots — the `pm2 startup` command prints another
-# command you have to run as root. Do that.
-sudo -u deploy pm2 startup systemd -u deploy --hp /home/deploy
-# ... it prints a `sudo env PATH=... pm2 startup ...` command — copy/paste it.
-```
-
-### 6. Install the deploy script
+### 5. First deploy
 
 ```bash
 install -m 755 -o root -g root \
   /var/www/gearup/deploy/gearup-deploy.sh \
   /usr/local/bin/gearup-deploy.sh
+
+sudo -u deploy bash /usr/local/bin/gearup-deploy.sh
 ```
 
-### 7. Nginx reverse proxy
+This builds the image and starts the container. Container is bound to
+`127.0.0.1:3000` only — you need a reverse proxy on the host (or in another
+container) to expose it.
+
+### 6. Reverse proxy + HTTPS — pick one
+
+**A. You already run Traefik / Caddy / nginx-proxy in Docker**: open
+`docker-compose.yml`, uncomment the Traefik labels block at the bottom,
+remove the `ports:` block, and set the `proxy` external network name to
+match yours. Redeploy:
 
 ```bash
-# Edit the file and replace <DOMAIN> with your real hostname first:
+sudo -u deploy bash /usr/local/bin/gearup-deploy.sh
+```
+
+**B. No reverse proxy yet — use host Nginx**:
+
+```bash
+apt install -y nginx certbot python3-certbot-nginx
+
 sed "s/<DOMAIN>/your-domain.com/" /var/www/gearup/deploy/nginx.conf \
   > /etc/nginx/sites-available/gearup.conf
 ln -sf /etc/nginx/sites-available/gearup.conf /etc/nginx/sites-enabled/gearup.conf
 rm -f /etc/nginx/sites-enabled/default
 nginx -t && systemctl reload nginx
-```
 
-### 8. HTTPS
-
-```bash
 certbot --nginx -d your-domain.com
-# Pick "redirect HTTP → HTTPS" when asked. Renewal is auto via systemd timer.
 ```
 
-Visit `https://your-domain.com` — you should hit the login page.
+Visit `https://your-domain.com` — should land on the login page.
 
 ---
 
 ## GitHub auto-deploy
 
-In the repo on github.com → **Settings → Secrets and variables → Actions** → add four secrets:
+In the repo on github.com → **Settings → Secrets and variables → Actions** —
+add four secrets:
 
 | Name | Value |
 |---|---|
 | `VPS_HOST` | your VPS IP or hostname |
 | `VPS_USER` | `deploy` |
-| `VPS_SSH_KEY` | contents of the **private** key whose `.pub` you put in `/home/deploy/.ssh/authorized_keys` |
+| `VPS_SSH_KEY` | contents of the **private** key whose `.pub` is in `/home/deploy/.ssh/authorized_keys` |
 | `VPS_PORT` | (optional) SSH port if non-standard |
 
-That's it. Next push to `main` triggers `.github/workflows/deploy.yml` → SSHes in → runs `/usr/local/bin/gearup-deploy.sh` → reloads pm2. Watch progress in the repo's **Actions** tab.
+Next push to `main` triggers `.github/workflows/deploy.yml` → SSH in → run
+`/usr/local/bin/gearup-deploy.sh` → `docker compose up -d --build`. Watch
+progress in the **Actions** tab.
 
 ---
 
@@ -133,21 +129,23 @@ That's it. Next push to `main` triggers `.github/workflows/deploy.yml` → SSHes
 
 | Task | Command |
 |---|---|
-| Tail logs | `pm2 logs gearup` |
-| Restart manually | `pm2 reload gearup --update-env` |
-| Edit env vars | `nano /var/www/gearup/.env.local` then `pm2 reload gearup --update-env`. **`NEXT_PUBLIC_*` changes also need a rebuild** — easiest is to trigger a manual deploy from GitHub Actions ("Run workflow"). |
+| Tail logs | `docker compose -f /var/www/gearup/docker-compose.yml logs -f` |
+| Restart | `docker compose -f /var/www/gearup/docker-compose.yml restart gearup` |
+| Edit env | `nano /var/www/gearup/.env.local` then `docker compose up -d --build` (rebuild needed for `NEXT_PUBLIC_*`; otherwise `restart` is enough) |
 | Manual deploy | `bash /usr/local/bin/gearup-deploy.sh` (as `deploy` user) |
-| Status | `pm2 status` |
-| Backup data | `tar czf gearup-backup-$(date +%F).tgz -C /var/www/gearup data/` (or `scp` it home) |
-| Rollback | `cd /var/www/gearup && git log --oneline | head -5` to pick a SHA, then `git reset --hard <sha> && npm ci && npm run build && pm2 reload gearup --update-env` |
+| Status | `docker compose ps` and `docker compose top` |
+| Rollback | `cd /var/www/gearup && git log --oneline \| head -5`, pick a SHA, `git reset --hard <sha> && bash /usr/local/bin/gearup-deploy.sh` |
+| Shell into container | `docker compose exec gearup sh` |
 
 ## Filesystem layout on the VPS
 
 ```
 /var/www/gearup/
-├── .env.local            # production secrets, never in git
-├── data/
-│   ├── devices.json      # gitignored — created on first request
+├── .env.local            # secrets, never in git, not in image
+├── docker-compose.yml
+├── Dockerfile
+├── data/                 # bind-mounted into the container at /app/data
+│   ├── devices.json      # created lazily on first request
 │   ├── groups.json
 │   ├── categories.json
 │   ├── resellers.json
@@ -157,12 +155,13 @@ That's it. Next push to `main` triggers `.github/workflows/deploy.yml` → SSHes
 └── ...                   # rest of the repo
 ```
 
-Everything under `data/` is gitignored. `git reset --hard` in the deploy script doesn't touch it. The container/VPS reboot doesn't touch it. The only ways to lose this data:
+Everything under `data/` is gitignored, lives on the host, survives `git reset
+--hard` and container rebuilds. The container is stateless; the volume is the
+state.
 
-1. You `rm -rf /var/www/gearup/data/`
-2. Hostinger replaces the VPS disk (very rare; back up periodically)
+## Backups
 
-Run a periodic backup. A weekly cron is enough for personal use:
+A weekly cron is enough for personal use:
 
 ```bash
 # As root:
@@ -175,4 +174,15 @@ EOF
 chmod +x /etc/cron.weekly/gearup-backup
 ```
 
-Keeps weekly snapshots, prunes anything older than 60 days.
+Keeps weekly snapshots, prunes after 60 days. Mirror them off-box with
+`rsync` to your laptop or to S3 if you want true off-site redundancy.
+
+## Troubleshooting
+
+| Symptom | Likely cause |
+|---|---|
+| `502 Bad Gateway` after push | Container failed to start — `docker compose logs gearup` |
+| Login page loads but every API returns 401 | `AUTH_PASSWORD` env var differs from what you're typing |
+| Login page redirects forever | `SESSION_SECRET` is unset *and* the container can't read `AUTH_PASSWORD` (fallback derivation failed) — check `env_file` path |
+| Logo.dev images broken after env change | `NEXT_PUBLIC_LOGODEV_KEY` is build-time — needs `up -d --build`, not just `restart` |
+| `data/` permission errors | Bind-mount owned by root on the host but the container runs as uid 1001. Fix: `chown -R 1001:1001 /var/www/gearup/data` |

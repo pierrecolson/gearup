@@ -1,0 +1,65 @@
+# docker-compose.yml — production compose for GearUp on the VPS.
+#
+# Build + runtime env both come from .env.local in this directory. Run with:
+#
+#   docker compose --env-file .env.local up -d --build
+#
+# The deploy script (deploy/gearup-deploy.sh) does this for you.
+
+services:
+  gearup:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        # NEXT_PUBLIC_* must be present at BUILD time — it's inlined into the
+        # client bundle. Compose interpolates this from --env-file .env.local.
+        NEXT_PUBLIC_LOGODEV_KEY: ${NEXT_PUBLIC_LOGODEV_KEY:-}
+    image: gearup:latest
+    container_name: gearup
+    restart: unless-stopped
+
+    # Runtime env. Server-only secrets (THIINGS_API_KEY, OPENROUTER_API_KEY,
+    # AUTH_PASSWORD, SESSION_SECRET, etc.) are injected here, not baked in.
+    env_file:
+      - .env.local
+
+    # Bind to localhost only — assumes a reverse proxy on the host (Nginx,
+    # Traefik in another container, Caddy, etc.) terminates HTTPS and forwards
+    # to this port. To expose directly to the internet, change to "3000:3000"
+    # (NOT recommended without HTTPS in front).
+    ports:
+      - "127.0.0.1:3000:3000"
+
+    # Persistence: app writes JSON, receipts, and FX cache here. The bind
+    # mount points at ./data on the VPS, which survives container rebuilds
+    # and `git reset --hard`.
+    volumes:
+      - ./data:/app/data
+
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--spider", "http://localhost:3000/login"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+
+# ---------------------------------------------------------------------------
+# Traefik integration (uncomment if you already run Traefik on the VPS):
+#
+#     labels:
+#       - "traefik.enable=true"
+#       - "traefik.http.routers.gearup.rule=Host(`your-domain.com`)"
+#       - "traefik.http.routers.gearup.entrypoints=websecure"
+#       - "traefik.http.routers.gearup.tls.certresolver=letsencrypt"
+#       - "traefik.http.services.gearup.loadbalancer.server.port=3000"
+#     networks:
+#       - proxy
+#
+# networks:
+#   proxy:
+#     external: true
+#
+# When using Traefik labels, remove the `ports:` block above — Traefik
+# routes to the container directly over the shared network.
+# ---------------------------------------------------------------------------
