@@ -40,6 +40,9 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 
-# gearup local-only data
+# gearup local-only data — JSON files are runtime state, not source. The app
+# creates them lazily via store.ts ensureFile() / getSettings() fallback.
+# Local seed lives in scripts/seed.mjs (`npm run seed`).
+/data/*.json
 /data/uploads/
 /data/.cache/
