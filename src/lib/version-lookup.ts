@@ -3,6 +3,7 @@ import { promises as fs } from "node:fs";
 import path from "node:path";
 import { z } from "zod";
 import OpenAI from "openai";
+import { getSettings } from "./settings";
 
 /**
  * Look up product releases for a model family (e.g. "MacBook Pro 14") via
@@ -118,13 +119,25 @@ const RESPONSE_JSON_SCHEMA = {
   additionalProperties: false,
 } as const;
 
+/** Resolution order: settings.json → env var → hardcoded default. */
+async function resolveModel(): Promise<string> {
+  const settings = await getSettings();
+  if (settings.openRouterModel && settings.openRouterModel.trim()) {
+    return settings.openRouterModel.trim();
+  }
+  if (process.env.OPENROUTER_MODEL && process.env.OPENROUTER_MODEL.trim()) {
+    return process.env.OPENROUTER_MODEL.trim();
+  }
+  return DEFAULT_MODEL;
+}
+
 async function callLLM(
   client: OpenAI,
   family: string,
 ): Promise<VersionEntry[] | null> {
   try {
     const completion = await client.chat.completions.create({
-      model: process.env.OPENROUTER_MODEL ?? DEFAULT_MODEL,
+      model: await resolveModel(),
       messages: [
         { role: "system", content: SYSTEM_PROMPT },
         {

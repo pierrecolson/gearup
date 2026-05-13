@@ -113,6 +113,10 @@ export const SettingsSchema = z.object({
   displayCurrency: z.string().length(3).default("EUR"),
   defaultInputCurrency: z.string().length(3).default("KRW"),
   dateFormat: z.string().default("yyyy-MM-dd"),
+  // OpenRouter model ID used for AI version-release lookups. Null falls back
+  // to OPENROUTER_MODEL env var, then to the hardcoded default. Stored as a
+  // plain string so the user can pick any OpenRouter slug.
+  openRouterModel: z.string().nullable().default(null),
 });
 
 export type Settings = z.infer<typeof SettingsSchema>;
@@ -121,4 +125,17 @@ export const DEFAULT_SETTINGS: Settings = {
   displayCurrency: "EUR",
   defaultInputCurrency: "KRW",
   dateFormat: "yyyy-MM-dd",
+  openRouterModel: null,
 };
+
+/** Curated OpenRouter models surfaced as datalist suggestions in settings. */
+export const OPENROUTER_MODEL_SUGGESTIONS = [
+  "openai/gpt-5-mini",
+  "openai/gpt-5",
+  "openai/gpt-4o-mini",
+  "google/gemini-2.5-flash",
+  "google/gemini-2.5-pro",
+  "anthropic/claude-haiku-4-5",
+  "anthropic/claude-sonnet-4-6",
+  "meta-llama/llama-3.3-70b-instruct",
+] as const;

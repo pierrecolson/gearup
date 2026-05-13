@@ -15,7 +15,7 @@ import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { COMMON_CURRENCIES } from "@/lib/currency-format";
-import type { Settings } from "@/lib/types";
+import { OPENROUTER_MODEL_SUGGESTIONS, type Settings } from "@/lib/types";
 
 export function SettingsForm({ initial }: { initial: Settings }) {
   const router = useRouter();
@@ -24,6 +24,9 @@ export function SettingsForm({ initial }: { initial: Settings }) {
     initial.defaultInputCurrency,
   );
   const [dateFormat, setDateFormat] = useState(initial.dateFormat);
+  const [openRouterModel, setOpenRouterModel] = useState(
+    initial.openRouterModel ?? "",
+  );
   const [pending, startTransition] = useTransition();
 
   function handleSubmit(e: React.FormEvent) {
@@ -36,6 +39,8 @@ export function SettingsForm({ initial }: { initial: Settings }) {
           displayCurrency,
           defaultInputCurrency,
           dateFormat,
+          // Empty string → null so the lookup falls back to env var / default.
+          openRouterModel: openRouterModel.trim() || null,
         }),
       });
       if (!res.ok) {
@@ -96,6 +101,28 @@ export function SettingsForm({ initial }: { initial: Settings }) {
         <p className="text-xs text-muted-foreground">
           date-fns format tokens. Reserved for future use — most surfaces
           currently use &ldquo;MMM yyyy&rdquo;.
+        </p>
+      </div>
+
+      <div className="space-y-1.5">
+        <Label>AI model (OpenRouter)</Label>
+        <Input
+          value={openRouterModel}
+          onChange={(e) => setOpenRouterModel(e.target.value)}
+          placeholder="openai/gpt-5-mini"
+          list="openrouter-models"
+          className="w-80 font-mono text-sm"
+        />
+        <datalist id="openrouter-models">
+          {OPENROUTER_MODEL_SUGGESTIONS.map((m) => (
+            <option key={m} value={m} />
+          ))}
+        </datalist>
+        <p className="text-xs text-muted-foreground">
+          Used for version-release lookups in device timelines. Leave blank
+          to use the <code>OPENROUTER_MODEL</code> env var, or the built-in
+          default (<code>openai/gpt-5-mini</code>). Type any OpenRouter slug;
+          the dropdown is just suggestions.
         </p>
       </div>
 
