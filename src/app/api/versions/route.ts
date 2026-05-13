@@ -4,7 +4,7 @@ import {
   VersionEntrySchema,
   lookupReleases,
   setManualReleases,
-} from "@/lib/anthropic";
+} from "@/lib/version-lookup";
 
 export async function GET(req: Request) {
   const url = new URL(req.url);

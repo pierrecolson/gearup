@@ -2,17 +2,20 @@ import "server-only";
 import { promises as fs } from "node:fs";
 import path from "node:path";
 import { z } from "zod";
-import Anthropic from "@anthropic-ai/sdk";
+import OpenAI from "openai";
 
 /**
  * Look up product releases for a model family (e.g. "MacBook Pro 14") via
- * Claude Haiku 4.5 with structured outputs + disk cache.
+ * OpenRouter + strict JSON-schema structured outputs, with a disk cache.
  *
  * Lookup order:
- *   1. Disk cache (TTL 30 days; manual edits are also stored here so they
- *      take precedence over AI results)
- *   2. Anthropic API — if `ANTHROPIC_API_KEY` is set
+ *   1. Disk cache (TTL 30 days for AI results; manual edits never expire)
+ *   2. OpenRouter — if `OPENROUTER_API_KEY` is set
  *   3. Empty array — graceful failure
+ *
+ * Default model is `openai/gpt-5-mini` — cheap, fast, native strict JSON
+ * schema support. Override with `OPENROUTER_MODEL` (e.g.
+ * `google/gemini-2.5-flash`, `anthropic/claude-haiku-4-5`).
  */
 
 export const VersionEntrySchema = z.object({
@@ -28,6 +31,7 @@ const ResponseSchema = z.object({
 
 const CACHE_DIR = path.join(process.cwd(), "data", ".cache", "versions");
 const TTL_MS = 30 * 24 * 60 * 60 * 1000;
+const DEFAULT_MODEL = "openai/gpt-5-mini";
 
 function slug(s: string): string {
   return s
@@ -50,8 +54,6 @@ async function readCache(family: string): Promise<CacheRecord | null> {
       "utf8",
     );
     const rec = JSON.parse(raw) as CacheRecord;
-    // Manual edits never expire; AI/empty entries fall through after TTL so
-    // we re-query Anthropic for fresher data.
     if (rec.source === "manual") return rec;
     if (Date.now() - new Date(rec.fetchedAt).getTime() > TTL_MS) return null;
     return rec;
@@ -69,9 +71,6 @@ async function writeCache(record: CacheRecord): Promise<void> {
   );
 }
 
-// Stable system prompt — flagged for caching even though it's well under
-// Haiku's 4K-token cache threshold. The marker is a no-op below the minimum
-// cacheable prefix; left in place so the prompt can be cheaply extended later.
 const SYSTEM_PROMPT = `You catalog consumer-electronics product releases.
 
 Given a product family name, list every major release in chronological order. Each release must be a real, shipping product — not concepts, prototypes, or rumors. Use the canonical product name as shipped by the manufacturer (e.g. "iPhone 15 Pro", "Sony α7 IV", "MacBook Pro 14 M3").
@@ -80,13 +79,25 @@ For releasedOn, return an ISO 8601 date string (YYYY-MM-DD). Use the first day o
 
 Your knowledge has a training cutoff — releases after that date may be missing. Return what you know. Do not invent products to fill perceived gaps. If the family is ambiguous, prefer the most prominent interpretation.`;
 
-let _client: Anthropic | null = null;
-function getClient(): Anthropic | null {
-  if (!process.env.ANTHROPIC_API_KEY) return null;
-  if (!_client) _client = new Anthropic();
+let _client: OpenAI | null = null;
+function getClient(): OpenAI | null {
+  if (!process.env.OPENROUTER_API_KEY) return null;
+  if (!_client) {
+    _client = new OpenAI({
+      apiKey: process.env.OPENROUTER_API_KEY,
+      baseURL: "https://openrouter.ai/api/v1",
+      defaultHeaders: {
+        // OpenRouter uses these for analytics / rankings — harmless to set.
+        "HTTP-Referer": "https://github.com/pierrecolson/gearup",
+        "X-Title": "GearUp",
+      },
+    });
+  }
   return _client;
 }
 
+// OpenAI-style strict JSON schema. `additionalProperties: false` and complete
+// `required` arrays are mandatory under strict mode.
 const RESPONSE_JSON_SCHEMA = {
   type: "object",
   properties: {
@@ -107,55 +118,42 @@ const RESPONSE_JSON_SCHEMA = {
   additionalProperties: false,
 } as const;
 
-async function callAnthropic(
-  client: Anthropic,
+async function callLLM(
+  client: OpenAI,
   family: string,
 ): Promise<VersionEntry[] | null> {
   try {
-    // `output_config` is a recent addition; the installed SDK may not type it
-    // yet. Cast through `never` to bypass param typing, then narrow the response.
-    const message = (await client.messages.create({
-      model: "claude-haiku-4-5",
-      max_tokens: 2048,
-      system: [
-        {
-          type: "text",
-          text: SYSTEM_PROMPT,
-          cache_control: { type: "ephemeral" },
-        },
-      ],
+    const completion = await client.chat.completions.create({
+      model: process.env.OPENROUTER_MODEL ?? DEFAULT_MODEL,
       messages: [
+        { role: "system", content: SYSTEM_PROMPT },
         {
           role: "user",
           content: `Product family: "${family}". List every major release.`,
         },
       ],
-      output_config: {
-        format: {
-          type: "json_schema",
+      response_format: {
+        type: "json_schema",
+        json_schema: {
+          name: "releases",
+          strict: true,
           schema: RESPONSE_JSON_SCHEMA,
         },
       },
-    } as never)) as Anthropic.Message;
+    });
 
-    const textBlock = message.content.find(
-      (b): b is Anthropic.TextBlock => b.type === "text",
-    );
-    if (!textBlock) return null;
-    const parsed = ResponseSchema.safeParse(JSON.parse(textBlock.text));
+    const text = completion.choices[0]?.message?.content;
+    if (!text) return null;
+    const parsed = ResponseSchema.safeParse(JSON.parse(text));
     if (!parsed.success) return null;
     return parsed.data.releases;
   } catch {
-    // Rate limits, network blips, refusals, schema misses — all degrade to
-    // empty so the UI never crashes on a missing AI response.
+    // Rate limits, network, refusals, schema misses — all degrade to empty
+    // so the UI never crashes on a missing AI response.
     return null;
   }
 }
 
-/**
- * Returns releases for the given family. Reads cache first; on miss, calls
- * Anthropic if a key is configured; caches the result. Always resolves.
- */
 export async function lookupReleases(
   family: string,
   opts: { refresh?: boolean } = {},
@@ -177,19 +175,17 @@ export async function lookupReleases(
         entries: cached.entries,
         cached: true,
         source: cached.source,
-        configured: Boolean(process.env.ANTHROPIC_API_KEY),
+        configured: Boolean(process.env.OPENROUTER_API_KEY),
       };
     }
   }
 
   const client = getClient();
   if (!client) {
-    // No key — don't write an empty cache entry; we want a real attempt the
-    // moment a key is configured.
     return { entries: [], cached: false, source: "empty", configured: false };
   }
 
-  const entries = await callAnthropic(client, family_);
+  const entries = await callLLM(client, family_);
   if (entries === null) {
     return { entries: [], cached: false, source: "empty", configured: true };
   }
@@ -203,7 +199,6 @@ export async function lookupReleases(
   return { entries, cached: false, source: "ai", configured: true };
 }
 
-/** Persist user-edited releases. Marks the entry as `manual` so AI won't overwrite. */
 export async function setManualReleases(
   family: string,
   entries: VersionEntry[],

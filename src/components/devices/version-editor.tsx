@@ -102,7 +102,7 @@ export function VersionEditor({
     setData(json);
     onChangeRef.current?.(json.entries);
     if (json.source === "empty" && !json.configured) {
-      toast.message("Set ANTHROPIC_API_KEY to enable AI lookup");
+      toast.message("Set OPENROUTER_API_KEY to enable AI lookup");
     } else if (json.source === "empty") {
       toast.message("No releases found — add them by hand below");
     } else {
@@ -156,7 +156,7 @@ export function VersionEditor({
 
       {data?.source === "empty" && !data.configured && (
         <p className="text-xs text-amber-600 dark:text-amber-400">
-          AI lookup not configured. Set <code>ANTHROPIC_API_KEY</code> in{" "}
+          AI lookup not configured. Set <code>OPENROUTER_API_KEY</code> in{" "}
           <code>.env.local</code> and refresh, or add releases manually below.
         </p>
       )}

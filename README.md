@@ -35,7 +35,7 @@ data/.cache/           # FX rates, thiings icons, version lookups (gitignored)
 
 Next.js 16 · React 19 · TypeScript · Tailwind v4 · shadcn/ui (base-nova) · Recharts · date-fns · Zod · Phosphor icons.
 
-External data sources: Frankfurter (historical FX) · logo.dev (brand/reseller logos) · Google s2 favicons (reseller fallback) · thiings API (9000 category icons) · Anthropic Claude Haiku 4.5 (optional version-release lookup).
+External data sources: Frankfurter (historical FX) · logo.dev (brand/reseller logos) · Google s2 favicons (reseller fallback) · thiings API (9000 category icons) · OpenRouter (optional version-release lookup; defaults to `openai/gpt-5-mini`).
 
 ## Currency model
 
@@ -52,7 +52,8 @@ NEXT_PUBLIC_LOGODEV_KEY=pk_...   # brand & reseller logos (publishable; safe in 
 LOGODEV_SECRET=sk_...            # logo.dev server-side ops (currently unused; reserve)
 THIINGS_API_URL=...              # self-hosted thiings catalog
 THIINGS_API_KEY=...              # bearer for the thiings API
-ANTHROPIC_API_KEY=sk-ant-...     # optional — enables AI version-release lookup
+OPENROUTER_API_KEY=sk-or-...     # optional — enables AI version-release lookup
+OPENROUTER_MODEL=openai/gpt-5-mini  # optional override; e.g. google/gemini-2.5-flash
 ```
 
 All keys are optional; the app gracefully degrades (letter-monogram logos, no thiings icons, no AI lookup) when any are missing.
