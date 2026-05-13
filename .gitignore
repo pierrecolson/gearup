@@ -46,3 +46,6 @@ next-env.d.ts
 /data/*.json
 /data/uploads/
 /data/.cache/
+
+# Personal progress/todo notes — kept locally, never pushed.
+/PROGRESS.md
