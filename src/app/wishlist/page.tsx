@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import { listDevices, listGroups } from "@/lib/store";
 import { PageHeader } from "@/components/page-header";
 import { DeviceExplorer } from "@/components/devices/device-explorer";
@@ -12,7 +13,9 @@ export default async function WishlistPage() {
         title="Wishlist"
         description="Things you'd like to own."
       />
-      <DeviceExplorer devices={wishes} groups={groups} showWishlist />
+      <Suspense fallback={null}>
+        <DeviceExplorer devices={wishes} groups={groups} showWishlist />
+      </Suspense>
     </div>
   );
 }

@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import { listDevices, listGroups } from "@/lib/store";
 import { listResellers } from "@/lib/resellers-store";
 import { loadCategories } from "@/lib/categories-store";
@@ -77,7 +78,9 @@ export default async function DevicesPage({
           description="All your owned, sold, and retired gear."
         />
       )}
-      <DeviceExplorer devices={owned} groups={groups} />
+      <Suspense fallback={null}>
+        <DeviceExplorer devices={owned} groups={groups} />
+      </Suspense>
     </div>
   );
 }

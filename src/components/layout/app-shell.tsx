@@ -33,7 +33,9 @@ export function AppShell({
       <aside className="hidden lg:flex sticky top-0 h-screen w-60 shrink-0 flex-col border-r border-border/60 bg-background">
         <BrandMark />
         <div className="flex-1 overflow-y-auto">
-          <SidebarNav categories={categories} categoryCounts={categoryCounts} />
+          <Suspense fallback={null}>
+            <SidebarNav categories={categories} categoryCounts={categoryCounts} />
+          </Suspense>
         </div>
         <div className="p-3 border-t border-border/60 flex items-center justify-between">
           <span className="text-xs text-muted-foreground">v0.1.0</span>
@@ -57,11 +59,13 @@ export function AppShell({
             <SheetContent side="left" className="w-64 p-0">
               <SheetTitle className="sr-only">Navigation</SheetTitle>
               <BrandMark />
-              <SidebarNav
-                categories={categories}
-                categoryCounts={categoryCounts}
-                onNavigate={() => setOpen(false)}
-              />
+              <Suspense fallback={null}>
+                <SidebarNav
+                  categories={categories}
+                  categoryCounts={categoryCounts}
+                  onNavigate={() => setOpen(false)}
+                />
+              </Suspense>
             </SheetContent>
           </Sheet>
           <BrandMark />
