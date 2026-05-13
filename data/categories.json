@@ -1,0 +1,14 @@
+[
+  {
+    "id": "drone",
+    "label": "Drone",
+    "tone": "blue",
+    "iconSlug": "personal-drone"
+  },
+  {
+    "id": "e-bike",
+    "label": "E-bike",
+    "tone": "lime",
+    "iconSlug": "bicycle"
+  }
+]

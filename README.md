@@ -45,7 +45,7 @@ External data sources: Frankfurter (historical FX) · logo.dev (brand/reseller l
 
 ## Environment
 
-Copy `.env.local.example` (or hand-build it) with the keys you want enabled:
+Hand-build `.env.local` (gitignored) with the keys you want enabled:
 
 ```
 NEXT_PUBLIC_LOGODEV_KEY=pk_...   # brand & reseller logos (publishable; safe in client)
