@@ -1,9 +1,11 @@
+"use client";
+
 import Link from "next/link";
-import { format } from "date-fns";
 import { BrandLogo } from "./brand-logo";
 import { CategoryChip } from "./category-chip";
 import { WarrantyBadge } from "./warranty-badge";
 import { formatMoney } from "@/lib/currency-format";
+import { useFormatShortDate } from "@/components/date-format-provider";
 import type { Device } from "@/lib/types";
 
 export function DeviceRowHeader() {
@@ -19,6 +21,7 @@ export function DeviceRowHeader() {
 }
 
 export function DeviceRow({ device }: { device: Device }) {
+  const formatShort = useFormatShortDate();
   return (
     <Link
       href={`?d=${device.id}`}
@@ -38,7 +41,7 @@ export function DeviceRow({ device }: { device: Device }) {
         <CategoryChip category={device.category} />
       </div>
       <div className="text-sm text-muted-foreground tabular-nums">
-        {device.purchaseDate ? format(new Date(device.purchaseDate), "MMM yyyy") : "—"}
+        {formatShort(device.purchaseDate)}
       </div>
       <div className="text-sm tabular-nums text-right">
         {device.pricePaidBaseSnapshot !== null && device.baseCurrencyAtSnapshot

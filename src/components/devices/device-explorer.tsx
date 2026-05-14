@@ -1,15 +1,14 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import Link from "next/link";
-import { useSearchParams } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import {
   Plus,
   MagnifyingGlass,
   SquaresFour,
   List,
 } from "@phosphor-icons/react/ssr";
-import { Button, buttonVariants } from "@/components/ui/button";
+import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
   Select,
@@ -20,6 +19,7 @@ import {
 } from "@/components/ui/select";
 import { DeviceCard } from "./device-card";
 import { DeviceRow, DeviceRowHeader } from "./device-row";
+import { AddDeviceDialog } from "./add-device-dialog";
 import { useCategories } from "@/components/categories-provider";
 import { findCategory } from "@/lib/categories";
 import type { Device, Group } from "@/lib/types";
@@ -31,7 +31,13 @@ export function DeviceExplorer({
   devices,
   groups,
   showWishlist = false,
+  defaultInputCurrency,
+  brandSuggestions = [],
+  resellerNames = [],
 }: {
+  defaultInputCurrency?: string;
+  brandSuggestions?: string[];
+  resellerNames?: string[];
   devices: Device[];
   groups: Group[];
   showWishlist?: boolean;
@@ -81,9 +87,23 @@ export function DeviceExplorer({
     [filtered, groupBy, groups, categories],
   );
 
-  const addHref = showWishlist
-    ? "/devices/new?status=wishlist"
-    : "/devices/new";
+  const router = useRouter();
+  const pathname = usePathname();
+  const urlAdd = searchParams.get("add");
+  const [addOpen, setAddOpen] = useState(false);
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    if (urlAdd === "1") setAddOpen(true);
+  }, [urlAdd]);
+  function handleAddOpenChange(next: boolean) {
+    setAddOpen(next);
+    if (!next && urlAdd === "1") {
+      const params = new URLSearchParams(searchParams.toString());
+      params.delete("add");
+      const qs = params.toString();
+      router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
+    }
+  }
 
   return (
     <div className="space-y-5">
@@ -169,16 +189,30 @@ export function DeviceExplorer({
               <List className="size-4" />
             </Button>
           </div>
-          <Link href={addHref} className={buttonVariants()}>
+          <Button onClick={() => setAddOpen(true)}>
             <Plus className="size-4" />
             Add {showWishlist ? "wish" : "device"}
-          </Link>
+          </Button>
         </div>
       </div>
 
+      <AddDeviceDialog
+        open={addOpen}
+        onOpenChange={handleAddOpenChange}
+        initialStatus={showWishlist ? "wishlist" : "owned"}
+        groups={groups}
+        defaults={{ currency: defaultInputCurrency }}
+        brandSuggestions={brandSuggestions}
+        resellerNames={resellerNames}
+      />
+
       {/* Content */}
       {filtered.length === 0 ? (
-        <EmptyState showWishlist={showWishlist} hasAnyDevices={devices.length > 0} />
+        <EmptyState
+          showWishlist={showWishlist}
+          hasAnyDevices={devices.length > 0}
+          onAdd={() => setAddOpen(true)}
+        />
       ) : (
         <div className="space-y-8">
           {grouped.map((g) => (
@@ -220,9 +254,11 @@ export function DeviceExplorer({
 function EmptyState({
   showWishlist,
   hasAnyDevices,
+  onAdd,
 }: {
   showWishlist: boolean;
   hasAnyDevices: boolean;
+  onAdd: () => void;
 }) {
   if (hasAnyDevices) {
     return (
@@ -243,13 +279,10 @@ function EmptyState({
           ? "Add things you'd like to own — they'll show up here."
           : "Start by adding your first device."}
       </p>
-      <Link
-        href={showWishlist ? "/devices/new?status=wishlist" : "/devices/new"}
-        className={buttonVariants({ className: "mt-4" })}
-      >
+      <Button onClick={onAdd} className="mt-4">
         <Plus className="size-4" />
         Add {showWishlist ? "wish" : "device"}
-      </Link>
+      </Button>
     </div>
   );
 }

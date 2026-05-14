@@ -11,7 +11,9 @@ type SettingsRow = {
   updated_at: string;
 };
 
-function fromRow(r: SettingsRow): Settings {
+function fromRow(r: SettingsRow) {
+  // dateFormat is an enum; legacy stored values that aren't in the enum are
+  // coerced to the default via the schema's .catch() at parse time.
   return {
     displayCurrency: r.display_currency,
     defaultInputCurrency: r.default_input_currency,

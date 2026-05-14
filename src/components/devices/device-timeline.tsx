@@ -2,12 +2,12 @@
 
 import {
   addMonths,
-  format,
   formatDistanceToNowStrict,
   isAfter,
   isBefore,
   isSameDay,
 } from "date-fns";
+import { useFormatDate } from "@/components/date-format-provider";
 import {
   ShoppingBagOpen,
   ShieldCheck,
@@ -83,6 +83,7 @@ export function DeviceTimeline({
     const d = new Date(v.releasedOn);
     if (Number.isNaN(d.getTime())) continue;
     if (isBefore(d, purchase)) continue;
+    if (isAfter(d, today)) continue;
     milestones.push({ date: d, label: v.name, tone: "version" });
   }
   milestones.push({ date: today, label: "Today", tone: "today" });
@@ -111,6 +112,7 @@ function MilestoneRow({
   milestone: Milestone;
   today: Date;
 }) {
+  const formatDate = useFormatDate();
   const Icon = ICONS[milestone.tone];
   const isToday = milestone.tone === "today";
   const isPast = isBefore(milestone.date, today) && !isSameDay(milestone.date, today);
@@ -144,7 +146,7 @@ function MilestoneRow({
           {milestone.label}
         </div>
         <div className="text-xs text-muted-foreground tabular-nums mt-0.5 flex items-center gap-1.5">
-          <span>{format(milestone.date, "MMM d, yyyy")}</span>
+          <span>{formatDate(milestone.date)}</span>
           <span className="text-border">·</span>
           <span>{relative}</span>
         </div>

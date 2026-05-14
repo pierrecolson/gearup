@@ -1,12 +1,15 @@
+"use client";
+
 import Link from "next/link";
-import { format } from "date-fns";
 import { BrandLogo } from "./brand-logo";
 import { CategoryChip } from "./category-chip";
 import { WarrantyBadge } from "./warranty-badge";
 import { PricePrimary } from "./price-display";
+import { useFormatShortDate } from "@/components/date-format-provider";
 import type { Device } from "@/lib/types";
 
 export function DeviceCard({ device }: { device: Device }) {
+  const formatShort = useFormatShortDate();
   return (
     <Link
       href={`?d=${device.id}`}
@@ -40,7 +43,7 @@ export function DeviceCard({ device }: { device: Device }) {
       </div>
       {device.purchaseDate && (
         <div className="mt-3 text-xs text-muted-foreground">
-          Purchased {format(new Date(device.purchaseDate), "MMM yyyy")}
+          Purchased {formatShort(device.purchaseDate)}
           {device.purchaseLocation ? ` · ${device.purchaseLocation}` : ""}
         </div>
       )}

@@ -1,6 +1,5 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { format } from "date-fns";
 import { Pencil, ArrowSquareOut } from "@phosphor-icons/react/ssr";
 import {
   getDevice,
@@ -12,6 +11,7 @@ import { listResellers } from "@/lib/resellers-store";
 import { getSettings } from "@/lib/settings";
 import { liveConvert } from "@/lib/currency";
 import { formatMoney } from "@/lib/currency-format";
+import { formatFullDate, formatShortDate } from "@/lib/date-format";
 import { ageInYears, warrantyEndsAt } from "@/lib/selectors";
 import { PageHeader } from "@/components/page-header";
 import { buttonVariants } from "@/components/ui/button";
@@ -126,11 +126,7 @@ export default async function DeviceDetailPage({ params, searchParams }: Ctx) {
                       device.pricePaidBaseSnapshot,
                       device.baseCurrencyAtSnapshot,
                     )}
-                    sub={
-                      device.purchaseDate
-                        ? format(new Date(device.purchaseDate), "MMM yyyy")
-                        : "—"
-                    }
+                    sub={formatShortDate(device.purchaseDate, settings.dateFormat)}
                   />
                 )}
                 {livePrice !== null && (
@@ -148,9 +144,7 @@ export default async function DeviceDetailPage({ params, searchParams }: Ctx) {
 
           <div className="space-y-3 text-sm">
             <Row label="Purchased">
-              {device.purchaseDate
-                ? format(new Date(device.purchaseDate), "MMM d, yyyy")
-                : "—"}
+              {formatFullDate(device.purchaseDate, settings.dateFormat)}
             </Row>
             <Row label="Where">{device.purchaseLocation ?? "—"}</Row>
             <Row label="Condition">
@@ -160,7 +154,7 @@ export default async function DeviceDetailPage({ params, searchParams }: Ctx) {
               {device.warrantyMonths
                 ? `${device.warrantyMonths} months${
                     warrantyEndsAt(device)
-                      ? ` (until ${format(warrantyEndsAt(device)!, "MMM yyyy")})`
+                      ? ` (until ${formatShortDate(warrantyEndsAt(device), settings.dateFormat)})`
                       : ""
                   }`
                 : "—"}
@@ -169,9 +163,7 @@ export default async function DeviceDetailPage({ params, searchParams }: Ctx) {
               {ageInYears(device) !== null ? `${ageInYears(device)} years` : "—"}
             </Row>
             <Row label="Renewal target">
-              {device.expectedRenewalDate
-                ? format(new Date(device.expectedRenewalDate), "MMM yyyy")
-                : "—"}
+              {formatShortDate(device.expectedRenewalDate, settings.dateFormat)}
             </Row>
             <Row label="Receipt #">{device.receiptNumber ?? "—"}</Row>
             <Row label="Serial #">

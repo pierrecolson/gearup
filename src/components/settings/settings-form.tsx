@@ -15,7 +15,12 @@ import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { COMMON_CURRENCIES } from "@/lib/currency-format";
-import { OPENROUTER_MODEL_SUGGESTIONS, type Settings } from "@/lib/types";
+import {
+  DATE_FORMATS,
+  OPENROUTER_MODEL_SUGGESTIONS,
+  type DateFormat,
+  type Settings,
+} from "@/lib/types";
 
 export function SettingsForm({ initial }: { initial: Settings }) {
   const router = useRouter();
@@ -92,15 +97,28 @@ export function SettingsForm({ initial }: { initial: Settings }) {
 
       <div className="space-y-1.5">
         <Label>Date format</Label>
-        <Input
+        <Select
           value={dateFormat}
-          onChange={(e) => setDateFormat(e.target.value)}
-          className="w-48 font-mono text-sm"
-          placeholder="yyyy-MM-dd"
-        />
+          onValueChange={(v) => v && setDateFormat(v as DateFormat)}
+        >
+          <SelectTrigger className="w-64">
+            <SelectValue>
+              {(value: unknown) => {
+                const found = DATE_FORMATS.find((f) => f.value === value);
+                return found ? `${found.label} (${found.example})` : "";
+              }}
+            </SelectValue>
+          </SelectTrigger>
+          <SelectContent>
+            {DATE_FORMATS.map((f) => (
+              <SelectItem key={f.value} value={f.value}>
+                {f.label} ({f.example})
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
         <p className="text-xs text-muted-foreground">
-          date-fns format tokens. Reserved for future use — most surfaces
-          currently use &ldquo;MMM yyyy&rdquo;.
+          How dates render across the app — on cards, panels, and timelines.
         </p>
       </div>
 
