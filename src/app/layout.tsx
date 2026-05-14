@@ -8,6 +8,12 @@ import { loadCategories } from "@/lib/categories-store";
 import { listDevices } from "@/lib/store";
 import { Toaster } from "@/components/ui/sonner";
 
+// Root layout reads live state from Supabase (devices for sidebar counts,
+// categories). Without this, Next prerenders the layout at build time and the
+// sidebar badges + every child page get frozen to the build-time snapshot,
+// including against out-of-band edits in Supabase.
+export const dynamic = "force-dynamic";
+
 const geistSans = Geist({
   variable: "--font-sans",
   subsets: ["latin"],
