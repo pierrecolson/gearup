@@ -1,34 +1,56 @@
 import "server-only";
-import { promises as fs } from "node:fs";
-import path from "node:path";
 import { nanoid } from "nanoid";
-import { ResellerSchema, type Reseller, type ResellerInput } from "./types";
-import { z } from "zod";
+import { type Reseller, type ResellerInput } from "./types";
+import { supabase } from "./supabase";
 
-const STORE = path.join(process.cwd(), "data", "resellers.json");
+type ResellerRow = {
+  id: string;
+  name: string;
+  url: string;
+  notes: string | null;
+  created_at: string;
+  updated_at: string;
+};
 
-async function read(): Promise<Reseller[]> {
-  try {
-    const raw = await fs.readFile(STORE, "utf8");
-    const parsed = z.array(ResellerSchema).safeParse(JSON.parse(raw));
-    return parsed.success ? parsed.data : [];
-  } catch {
-    return [];
-  }
+function fromRow(r: ResellerRow): Reseller {
+  return {
+    id: r.id,
+    name: r.name,
+    url: r.url,
+    notes: r.notes,
+    createdAt: r.created_at,
+    updatedAt: r.updated_at,
+  };
 }
 
-async function write(items: Reseller[]) {
-  await fs.mkdir(path.dirname(STORE), { recursive: true });
-  await fs.writeFile(STORE, JSON.stringify(items, null, 2) + "\n", "utf8");
+function toRow(r: Reseller): ResellerRow {
+  return {
+    id: r.id,
+    name: r.name,
+    url: r.url,
+    notes: r.notes,
+    created_at: r.createdAt,
+    updated_at: r.updatedAt,
+  };
 }
 
 export async function listResellers(): Promise<Reseller[]> {
-  return read();
+  const { data, error } = await supabase
+    .from("resellers")
+    .select("*")
+    .order("created_at", { ascending: false });
+  if (error) throw error;
+  return (data as ResellerRow[]).map(fromRow);
 }
 
 export async function getReseller(id: string): Promise<Reseller | null> {
-  const all = await read();
-  return all.find((r) => r.id === id) ?? null;
+  const { data, error } = await supabase
+    .from("resellers")
+    .select("*")
+    .eq("id", id)
+    .maybeSingle();
+  if (error) throw error;
+  return data ? fromRow(data as ResellerRow) : null;
 }
 
 export async function createReseller(input: ResellerInput): Promise<Reseller> {
@@ -39,16 +61,16 @@ export async function createReseller(input: ResellerInput): Promise<Reseller> {
     createdAt: now,
     updatedAt: now,
   };
-  const all = await read();
-  all.push(reseller);
-  await write(all);
+  const { error } = await supabase.from("resellers").insert(toRow(reseller));
+  if (error) throw error;
   return reseller;
 }
 
 export async function deleteReseller(id: string): Promise<boolean> {
-  const all = await read();
-  const next = all.filter((r) => r.id !== id);
-  if (next.length === all.length) return false;
-  await write(next);
-  return true;
+  const { error, count } = await supabase
+    .from("resellers")
+    .delete({ count: "exact" })
+    .eq("id", id);
+  if (error) throw error;
+  return (count ?? 0) > 0;
 }

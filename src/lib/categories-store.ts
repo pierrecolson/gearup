@@ -1,15 +1,20 @@
 import "server-only";
-import { promises as fs } from "node:fs";
-import path from "node:path";
 import { z } from "zod";
 import {
   BUILTIN_CATEGORIES,
   TONES,
   categorySlug,
   type CategoryDef,
+  type Tone,
 } from "./categories";
+import { supabase } from "./supabase";
 
-const STORE = path.join(process.cwd(), "data", "categories.json");
+type CategoryRow = {
+  id: string;
+  label: string;
+  tone: string;
+  icon_slug: string | null;
+};
 
 const StoredCategorySchema = z.object({
   id: z.string().min(1),
@@ -21,18 +26,18 @@ const StoredCategorySchema = z.object({
 type StoredCategory = z.infer<typeof StoredCategorySchema>;
 
 async function readStored(): Promise<StoredCategory[]> {
-  try {
-    const raw = await fs.readFile(STORE, "utf8");
-    const parsed = z.array(StoredCategorySchema).safeParse(JSON.parse(raw));
-    return parsed.success ? parsed.data : [];
-  } catch {
-    return [];
-  }
-}
-
-async function writeStored(items: StoredCategory[]): Promise<void> {
-  await fs.mkdir(path.dirname(STORE), { recursive: true });
-  await fs.writeFile(STORE, JSON.stringify(items, null, 2) + "\n", "utf8");
+  const { data, error } = await supabase
+    .from("categories")
+    .select("id, label, tone, icon_slug");
+  if (error) throw error;
+  return (data as CategoryRow[])
+    .map((r) => ({
+      id: r.id,
+      label: r.label,
+      tone: r.tone as Tone,
+      iconSlug: r.icon_slug,
+    }))
+    .filter((c) => StoredCategorySchema.safeParse(c).success);
 }
 
 /** All categories merged: built-ins first, then user-defined. */
@@ -78,30 +83,31 @@ export type AddCategoryInput = z.infer<typeof AddCategoryInputSchema>;
 export async function addCategory(input: AddCategoryInput): Promise<CategoryDef> {
   const id = input.id ?? categorySlug(input.label);
   if (!id) throw new Error("Invalid label");
-  const stored = await readStored();
-  const next: StoredCategory = {
+  const row: CategoryRow = {
     id,
     label: input.label.trim(),
     tone: input.tone,
-    iconSlug: input.iconSlug ?? null,
+    icon_slug: input.iconSlug ?? null,
   };
-  const without = stored.filter((c) => c.id !== id);
-  without.push(next);
-  await writeStored(without);
+  const { error } = await supabase
+    .from("categories")
+    .upsert(row, { onConflict: "id" });
+  if (error) throw error;
   return {
-    id: next.id,
-    label: next.label,
-    tone: next.tone,
-    iconSlug: next.iconSlug ?? null,
+    id: row.id,
+    label: row.label,
+    tone: row.tone as Tone,
+    iconSlug: row.icon_slug,
     builtin: BUILTIN_CATEGORIES.some((b) => b.id === id),
   };
 }
 
 /** Remove a user-added category. Built-ins can't be removed (silently no-op). */
 export async function removeCategory(id: string): Promise<boolean> {
-  const stored = await readStored();
-  const next = stored.filter((c) => c.id !== id);
-  if (next.length === stored.length) return false;
-  await writeStored(next);
-  return true;
+  const { error, count } = await supabase
+    .from("categories")
+    .delete({ count: "exact" })
+    .eq("id", id);
+  if (error) throw error;
+  return (count ?? 0) > 0;
 }

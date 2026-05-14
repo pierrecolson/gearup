@@ -1,16 +1,7 @@
 import { NextResponse } from "next/server";
-import { promises as fs } from "node:fs";
-import path from "node:path";
+import { supabase, RECEIPTS_BUCKET } from "@/lib/supabase";
 
-const ROOT = path.join(process.cwd(), "data", "uploads", "receipts");
-
-const MIME: Record<string, string> = {
-  pdf: "application/pdf",
-  png: "image/png",
-  jpg: "image/jpeg",
-  jpeg: "image/jpeg",
-  webp: "image/webp",
-};
+const SIGNED_URL_TTL_SECONDS = 60 * 60; // 1h — long enough for an open tab to keep rendering.
 
 type Ctx = { params: Promise<{ file: string }> };
 
@@ -20,17 +11,11 @@ export async function GET(_req: Request, { params }: Ctx) {
   if (file.includes("/") || file.includes("..")) {
     return NextResponse.json({ error: "Invalid path" }, { status: 400 });
   }
-  const ext = file.split(".").pop()?.toLowerCase() ?? "";
-  const filePath = path.join(ROOT, file);
-  try {
-    const data = await fs.readFile(filePath);
-    return new NextResponse(data, {
-      headers: {
-        "Content-Type": MIME[ext] ?? "application/octet-stream",
-        "Content-Disposition": `inline; filename="${file}"`,
-      },
-    });
-  } catch {
+  const { data, error } = await supabase.storage
+    .from(RECEIPTS_BUCKET)
+    .createSignedUrl(file, SIGNED_URL_TTL_SECONDS);
+  if (error || !data?.signedUrl) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
+  return NextResponse.redirect(data.signedUrl, 302);
 }

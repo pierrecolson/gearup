@@ -1,9 +1,7 @@
 import { NextResponse } from "next/server";
-import { promises as fs } from "node:fs";
-import path from "node:path";
 import { nanoid } from "nanoid";
+import { supabase, RECEIPTS_BUCKET } from "@/lib/supabase";
 
-const UPLOAD_DIR = path.join(process.cwd(), "data", "uploads", "receipts");
 const ALLOWED = new Set([
   "application/pdf",
   "image/png",
@@ -35,11 +33,20 @@ export async function POST(req: Request) {
   if (file.size > MAX_BYTES) {
     return NextResponse.json({ error: "File too large" }, { status: 413 });
   }
-  await fs.mkdir(UPLOAD_DIR, { recursive: true });
   const id = typeof deviceId === "string" && deviceId ? deviceId : nanoid(10);
   const filename = `${id}.${EXT[file.type]}`;
-  const dest = path.join(UPLOAD_DIR, filename);
   const buf = Buffer.from(await file.arrayBuffer());
-  await fs.writeFile(dest, buf);
+  const { error } = await supabase.storage
+    .from(RECEIPTS_BUCKET)
+    .upload(filename, buf, {
+      contentType: file.type,
+      upsert: true,
+    });
+  if (error) {
+    return NextResponse.json(
+      { error: `Upload failed: ${error.message}` },
+      { status: 500 },
+    );
+  }
   return NextResponse.json({ filename, path: `receipts/${filename}` });
 }
