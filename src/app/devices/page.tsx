@@ -3,6 +3,7 @@ import { listDevices, listGroups } from "@/lib/store";
 import { listResellers } from "@/lib/resellers-store";
 import { loadCategories } from "@/lib/categories-store";
 import { findCategory } from "@/lib/categories";
+import { getSettings } from "@/lib/settings";
 import { PageHeader } from "@/components/page-header";
 import { DeviceExplorer } from "@/components/devices/device-explorer";
 import { CategoryIcon } from "@/components/category-icon";
@@ -17,13 +18,15 @@ export default async function DevicesPage({
   searchParams: SearchParams;
 }) {
   const { category, reseller } = await searchParams;
-  const [devices, groups, categories, resellers] = await Promise.all([
+  const [devices, groups, categories, resellers, settings] = await Promise.all([
     listDevices(),
     listGroups(),
     loadCategories(),
     listResellers(),
+    getSettings(),
   ]);
   const owned = devices.filter((d) => d.status !== "wishlist");
+  const brandSuggestions = Array.from(new Set(devices.map((d) => d.brand))).sort();
   const activeCategory = category ? findCategory(category, categories) : null;
   const activeReseller = reseller
     ? resellers.find((r) => r.name === reseller) ?? {
@@ -79,7 +82,13 @@ export default async function DevicesPage({
         />
       )}
       <Suspense fallback={null}>
-        <DeviceExplorer devices={owned} groups={groups} />
+        <DeviceExplorer
+          devices={owned}
+          groups={groups}
+          defaultInputCurrency={settings.defaultInputCurrency}
+          brandSuggestions={brandSuggestions}
+          resellerNames={resellers.map((r) => r.name)}
+        />
       </Suspense>
     </div>
   );

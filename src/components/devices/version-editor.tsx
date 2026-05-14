@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { isAfter, parseISO } from "date-fns";
 import {
   ArrowsClockwise,
   CircleNotch,
@@ -10,6 +11,7 @@ import {
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { DatePicker } from "@/components/ui/date-picker";
 
 export type VersionEntry = { name: string; releasedOn: string | null };
 
@@ -31,9 +33,11 @@ type LookupResult = {
  */
 export function VersionEditor({
   family,
+  purchaseDate,
   onChange,
 }: {
   family: string;
+  purchaseDate?: string | null;
   onChange?: (entries: VersionEntry[]) => void;
 }) {
   const [data, setData] = useState<LookupResult | null>(null);
@@ -122,12 +126,28 @@ export function VersionEditor({
     setDraftDate("");
   }
 
-  function handleDelete(idx: number) {
-    const next = (data?.entries ?? []).filter((_, i) => i !== idx);
+  function handleDelete(entry: VersionEntry) {
+    const next = (data?.entries ?? []).filter(
+      (e) => !(e.name === entry.name && e.releasedOn === entry.releasedOn),
+    );
     void persist(next);
   }
 
-  const entries = data?.entries ?? [];
+  const allEntries = data?.entries ?? [];
+  const today = useMemo(() => new Date(), []);
+  const purchase = purchaseDate ? parseISO(purchaseDate) : null;
+  // Display filter: only releases that shipped strictly after purchase and on
+  // or before today. The unfiltered list still persists, so manual entries
+  // outside the window aren't lost on save.
+  const entries = allEntries.filter((e) => {
+    if (!e.releasedOn) return false;
+    const d = parseISO(e.releasedOn);
+    if (Number.isNaN(d.getTime())) return false;
+    if (purchase && !isAfter(d, purchase)) return false;
+    if (isAfter(d, today)) return false;
+    return true;
+  });
+  const hiddenCount = allEntries.length - entries.length;
 
   return (
     <section className="space-y-3">
@@ -163,33 +183,42 @@ export function VersionEditor({
 
       {entries.length === 0 && !loading ? (
         <p className="text-xs text-muted-foreground italic">
-          No releases yet. Add one below.
+          {allEntries.length === 0
+            ? "No releases yet. Add one below."
+            : "No newer releases since you bought it."}
         </p>
       ) : (
-        <ul className="divide-y divide-border/60 rounded-lg border border-border/60 bg-card text-sm">
-          {entries.map((e, i) => (
-            <li
-              key={`${e.name}-${i}`}
-              className="flex items-center justify-between gap-3 px-3 py-2"
-            >
-              <div className="min-w-0">
-                <div className="truncate">{e.name}</div>
-                <div className="text-xs text-muted-foreground tabular-nums">
-                  {e.releasedOn ?? "Date unknown"}
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={() => handleDelete(i)}
-                aria-label="Delete release"
-                disabled={saving}
-                className="text-muted-foreground hover:text-foreground"
+        <>
+          <ul className="divide-y divide-border/60 rounded-lg border border-border/60 bg-card text-sm">
+            {entries.map((e, i) => (
+              <li
+                key={`${e.name}-${i}`}
+                className="flex items-center justify-between gap-3 px-3 py-2"
               >
-                <Trash className="size-4" />
-              </button>
-            </li>
-          ))}
-        </ul>
+                <div className="min-w-0">
+                  <div className="truncate">{e.name}</div>
+                  <div className="text-xs text-muted-foreground tabular-nums">
+                    {e.releasedOn ?? "Date unknown"}
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => handleDelete(e)}
+                  aria-label="Delete release"
+                  disabled={saving}
+                  className="text-muted-foreground hover:text-foreground"
+                >
+                  <Trash className="size-4" />
+                </button>
+              </li>
+            ))}
+          </ul>
+          {hiddenCount > 0 && (
+            <p className="text-xs text-muted-foreground italic">
+              {hiddenCount} earlier release{hiddenCount === 1 ? "" : "s"} hidden.
+            </p>
+          )}
+        </>
       )}
 
       <form onSubmit={handleAdd} className="flex gap-2">
@@ -199,12 +228,13 @@ export function VersionEditor({
           placeholder="e.g. MacBook Pro 14 M4"
           className="flex-1"
         />
-        <Input
-          type="date"
-          value={draftDate}
-          onChange={(e) => setDraftDate(e.target.value)}
-          className="w-40"
-        />
+        <div className="w-44">
+          <DatePicker
+            value={draftDate || null}
+            onChange={(v) => setDraftDate(v ?? "")}
+            placeholder="Release date"
+          />
+        </div>
         <Button type="submit" size="sm" variant="outline" disabled={saving}>
           <Plus className="size-4" />
           Add

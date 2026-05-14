@@ -3,7 +3,6 @@
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
-import { format } from "date-fns";
 import { ArrowSquareOut, CircleNotch } from "@phosphor-icons/react/ssr";
 import {
   Sheet,
@@ -20,6 +19,10 @@ import { DeviceTimeline } from "./device-timeline";
 import { DeviceActionsMenu } from "./device-actions-menu";
 import { VersionEditor, type VersionEntry } from "./version-editor";
 import { formatMoney } from "@/lib/currency-format";
+import {
+  useFormatDate,
+  useFormatShortDate,
+} from "@/components/date-format-provider";
 import type { Device, Group } from "@/lib/types";
 
 type DetailPayload = {
@@ -114,6 +117,8 @@ export function DevicePanel() {
 function DevicePanelContent({ payload }: { payload: DetailPayload }) {
   const { device, group, siblings, livePrice, displayCurrency } = payload;
   const [versionReleases, setVersionReleases] = useState<VersionEntry[]>([]);
+  const formatDate = useFormatDate();
+  const formatShort = useFormatShortDate();
   return (
     <div className="px-6 py-6 space-y-6">
       {/* Header */}
@@ -171,11 +176,7 @@ function DevicePanelContent({ payload }: { payload: DetailPayload }) {
                       device.pricePaidBaseSnapshot,
                       device.baseCurrencyAtSnapshot,
                     )}
-                    sub={
-                      device.purchaseDate
-                        ? format(new Date(device.purchaseDate), "MMM yyyy")
-                        : "—"
-                    }
+                    sub={formatShort(device.purchaseDate)}
                   />
                 )}
               {livePrice !== null && (
@@ -193,11 +194,7 @@ function DevicePanelContent({ payload }: { payload: DetailPayload }) {
       {/* Info */}
       <Separator />
       <div className="space-y-2.5 text-sm">
-        <Row label="Purchased">
-          {device.purchaseDate
-            ? format(new Date(device.purchaseDate), "MMM d, yyyy")
-            : "—"}
-        </Row>
+        <Row label="Purchased">{formatDate(device.purchaseDate)}</Row>
         <Row label="Where">{device.purchaseLocation ?? "—"}</Row>
         <Row label="Condition">
           <span className="capitalize">{device.condition ?? "—"}</span>
@@ -206,9 +203,7 @@ function DevicePanelContent({ payload }: { payload: DetailPayload }) {
           {device.warrantyMonths ? `${device.warrantyMonths} months` : "—"}
         </Row>
         <Row label="Renewal target">
-          {device.expectedRenewalDate
-            ? format(new Date(device.expectedRenewalDate), "MMM yyyy")
-            : "—"}
+          {formatShort(device.expectedRenewalDate)}
         </Row>
         <Row label="Receipt #">{device.receiptNumber ?? "—"}</Row>
         <Row label="Serial #">
@@ -269,6 +264,7 @@ function DevicePanelContent({ payload }: { payload: DetailPayload }) {
           <Separator />
           <VersionEditor
             family={device.modelFamily}
+            purchaseDate={device.purchaseDate}
             onChange={setVersionReleases}
           />
         </>

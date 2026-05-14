@@ -3,6 +3,7 @@ import { promises as fs } from "node:fs";
 import path from "node:path";
 import { z } from "zod";
 import OpenAI from "openai";
+import type { ChatCompletion } from "openai/resources/chat/completions";
 import { getSettings } from "./settings";
 
 /**
@@ -33,6 +34,9 @@ const ResponseSchema = z.object({
 const CACHE_DIR = path.join(process.cwd(), "data", ".cache", "versions");
 const TTL_MS = 30 * 24 * 60 * 60 * 1000;
 const DEFAULT_MODEL = "openai/gpt-5-mini";
+// Bump when prompt / data shape changes so stale cached AI responses get
+// re-fetched. Manual edits keep their entries regardless.
+const CACHE_SCHEMA = 2;
 
 function slug(s: string): string {
   return s
@@ -46,6 +50,7 @@ export type CacheRecord = {
   fetchedAt: string;
   source: "ai" | "manual" | "empty";
   entries: VersionEntry[];
+  schema?: number;
 };
 
 async function readCache(family: string): Promise<CacheRecord | null> {
@@ -56,6 +61,8 @@ async function readCache(family: string): Promise<CacheRecord | null> {
     );
     const rec = JSON.parse(raw) as CacheRecord;
     if (rec.source === "manual") return rec;
+    // Schema bumps invalidate AI entries — manual edits above are preserved.
+    if ((rec.schema ?? 0) !== CACHE_SCHEMA) return null;
     if (Date.now() - new Date(rec.fetchedAt).getTime() > TTL_MS) return null;
     return rec;
   } catch {
@@ -67,7 +74,7 @@ async function writeCache(record: CacheRecord): Promise<void> {
   await fs.mkdir(CACHE_DIR, { recursive: true });
   await fs.writeFile(
     path.join(CACHE_DIR, `${slug(record.family)}.json`),
-    JSON.stringify(record, null, 2) + "\n",
+    JSON.stringify({ ...record, schema: CACHE_SCHEMA }, null, 2) + "\n",
     "utf8",
   );
 }
@@ -78,7 +85,7 @@ Given a product family name, list every major release in chronological order. Ea
 
 For releasedOn, return an ISO 8601 date string (YYYY-MM-DD). Use the first day of the month if only the month is known; the first day of the year if only the year is known. Return null only when the release date is genuinely unknown.
 
-Your knowledge has a training cutoff — releases after that date may be missing. Return what you know. Do not invent products to fill perceived gaps. If the family is ambiguous, prefer the most prominent interpretation.`;
+Web search results are available — use them to include releases that have shipped since your training cutoff. Do not include products that are only announced or rumored but not yet shipping. Do not invent products. If the family is ambiguous, prefer the most prominent interpretation.`;
 
 let _client: OpenAI | null = null;
 function getClient(): OpenAI | null {
@@ -135,25 +142,34 @@ async function callLLM(
   client: OpenAI,
   family: string,
 ): Promise<VersionEntry[] | null> {
+  const today = new Date().toISOString().slice(0, 10);
   try {
-    const completion = await client.chat.completions.create({
+    // OpenRouter-specific: `plugins` enables web search before the LLM runs,
+    // so we can return products that shipped after the model's training
+    // cutoff. The OpenAI SDK doesn't type this field, so we widen the body.
+    const body = {
       model: await resolveModel(),
       messages: [
-        { role: "system", content: SYSTEM_PROMPT },
+        { role: "system" as const, content: SYSTEM_PROMPT },
         {
-          role: "user",
-          content: `Product family: "${family}". List every major release.`,
+          role: "user" as const,
+          content: `Product family: "${family}". Today is ${today}. List every major release that has shipped on or before today.`,
         },
       ],
       response_format: {
-        type: "json_schema",
+        type: "json_schema" as const,
         json_schema: {
           name: "releases",
           strict: true,
           schema: RESPONSE_JSON_SCHEMA,
         },
       },
-    });
+      plugins: [{ id: "web", max_results: 5 }],
+    };
+    const completion = (await client.chat.completions.create(
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      body as any,
+    )) as ChatCompletion;
 
     const text = completion.choices[0]?.message?.content;
     if (!text) return null;

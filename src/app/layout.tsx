@@ -4,8 +4,10 @@ import "./globals.css";
 import { ThemeProvider } from "@/components/layout/theme-provider";
 import { AppShell } from "@/components/layout/app-shell";
 import { CategoriesProvider } from "@/components/categories-provider";
+import { DateFormatProvider } from "@/components/date-format-provider";
 import { loadCategories } from "@/lib/categories-store";
 import { listDevices } from "@/lib/store";
+import { getSettings } from "@/lib/settings";
 import { Toaster } from "@/components/ui/sonner";
 
 // Root layout reads live state from Supabase (devices for sidebar counts,
@@ -34,9 +36,10 @@ export default async function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  const [categories, devices] = await Promise.all([
+  const [categories, devices, settings] = await Promise.all([
     loadCategories(),
     listDevices(),
+    getSettings(),
   ]);
   // Count only "owned" devices per category — wishlist entries shouldn't make
   // a category appear non-empty.
@@ -59,9 +62,11 @@ export default async function RootLayout({
           disableTransitionOnChange
         >
           <CategoriesProvider categories={categories}>
-            <AppShell categories={categories} categoryCounts={categoryCounts}>
-              {children}
-            </AppShell>
+            <DateFormatProvider value={settings.dateFormat}>
+              <AppShell categories={categories} categoryCounts={categoryCounts}>
+                {children}
+              </AppShell>
+            </DateFormatProvider>
           </CategoriesProvider>
           <Toaster />
         </ThemeProvider>

@@ -109,10 +109,26 @@ export const ResellerInputSchema = ResellerSchema.omit({
 
 export type ResellerInput = z.infer<typeof ResellerInputSchema>;
 
+export const DATE_FORMATS = [
+  { value: "dd/MM/yyyy", label: "European", example: "14/05/2026" },
+  { value: "yyyy.MM.dd", label: "Korean", example: "2026.05.14" },
+  { value: "yyyy-MM-dd", label: "ISO 8601", example: "2026-05-14" },
+  { value: "MM/dd/yyyy", label: "US", example: "05/14/2026" },
+] as const;
+
+export const DATE_FORMAT_VALUES = DATE_FORMATS.map((f) => f.value) as [
+  (typeof DATE_FORMATS)[number]["value"],
+  ...(typeof DATE_FORMATS)[number]["value"][],
+];
+
+export type DateFormat = (typeof DATE_FORMATS)[number]["value"];
+
 export const SettingsSchema = z.object({
   displayCurrency: z.string().length(3).default("EUR"),
   defaultInputCurrency: z.string().length(3).default("KRW"),
-  dateFormat: z.string().default("yyyy-MM-dd"),
+  // Stored as a date-fns format token. Anything outside DATE_FORMAT_VALUES
+  // falls back to the European default via the catch().
+  dateFormat: z.enum(DATE_FORMAT_VALUES).catch("dd/MM/yyyy").default("dd/MM/yyyy"),
   // OpenRouter model ID used for AI version-release lookups. Null falls back
   // to OPENROUTER_MODEL env var, then to the hardcoded default. Stored as a
   // plain string so the user can pick any OpenRouter slug.
@@ -124,7 +140,7 @@ export type Settings = z.infer<typeof SettingsSchema>;
 export const DEFAULT_SETTINGS: Settings = {
   displayCurrency: "EUR",
   defaultInputCurrency: "KRW",
-  dateFormat: "yyyy-MM-dd",
+  dateFormat: "dd/MM/yyyy",
   openRouterModel: null,
 };
 

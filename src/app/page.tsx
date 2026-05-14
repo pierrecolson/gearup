@@ -1,6 +1,4 @@
-import Link from "next/link";
-import { Plus } from "@phosphor-icons/react/ssr";
-import { listDevices } from "@/lib/store";
+import { listDevices, listGroups } from "@/lib/store";
 import { listResellers } from "@/lib/resellers-store";
 import { getSettings } from "@/lib/settings";
 import {
@@ -15,7 +13,7 @@ import {
 } from "@/lib/selectors";
 import { formatMoney } from "@/lib/currency-format";
 import { PageHeader } from "@/components/page-header";
-import { buttonVariants } from "@/components/ui/button";
+import { AddDeviceLauncher } from "@/components/devices/add-device-launcher";
 import { StatTile } from "@/components/dashboard/stat-tile";
 import { SpendByBrand } from "@/components/dashboard/spend-by-brand";
 import { SpendByCategory } from "@/components/dashboard/spend-by-category";
@@ -24,11 +22,13 @@ import { WarrantyFeed } from "@/components/dashboard/warranty-feed";
 import { RecentActivity } from "@/components/dashboard/recent-activity";
 
 export default async function DashboardPage() {
-  const [devices, settings, resellers] = await Promise.all([
+  const [devices, settings, resellers, groups] = await Promise.all([
     listDevices(),
     getSettings(),
     listResellers(),
+    listGroups(),
   ]);
+  const brandSuggestions = Array.from(new Set(devices.map((d) => d.brand))).sort();
   const owned = ownedDevices(devices);
   const invested = totalInvestedFrozen(owned);
   const expiring = warrantiesExpiringSoon(owned, 90);
@@ -47,10 +47,12 @@ export default async function DashboardPage() {
         title="Overview"
         description="Everything you own, what it's worth, and when warranties run out."
         actions={
-          <Link href="/devices/new" className={buttonVariants()}>
-            <Plus className="size-4" />
-            Add device
-          </Link>
+          <AddDeviceLauncher
+            groups={groups}
+            defaultInputCurrency={settings.defaultInputCurrency}
+            brandSuggestions={brandSuggestions}
+            resellerNames={resellers.map((r) => r.name)}
+          />
         }
       />
 
