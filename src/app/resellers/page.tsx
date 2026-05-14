@@ -57,15 +57,21 @@ export default async function ResellersPage() {
                     <DeleteResellerButton id={r.id} name={r.name} />
                   </div>
                   <h3 className="font-medium tracking-tight">{r.name}</h3>
-                  <Link
-                    href={r.url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="mt-0.5 text-xs text-muted-foreground hover:underline inline-flex items-center gap-1 truncate"
-                  >
-                    {r.url.replace(/^https?:\/\//, "")}
-                    <ArrowSquareOut className="size-3 shrink-0" />
-                  </Link>
+                  {r.url ? (
+                    <Link
+                      href={r.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="mt-0.5 text-xs text-muted-foreground hover:underline inline-flex items-center gap-1 truncate"
+                    >
+                      {r.url.replace(/^https?:\/\//, "")}
+                      <ArrowSquareOut className="size-3 shrink-0" />
+                    </Link>
+                  ) : (
+                    <span className="mt-0.5 text-xs text-muted-foreground italic">
+                      No website yet
+                    </span>
+                  )}
                   {r.notes && (
                     <p className="mt-2 text-xs text-muted-foreground line-clamp-2">
                       {r.notes}

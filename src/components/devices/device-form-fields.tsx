@@ -159,7 +159,12 @@ export function IdentityFields({
           onValueChange={(v) => v && update("category", v)}
         >
           <SelectTrigger>
-            <SelectValue />
+            <SelectValue>
+              {(value: string) => {
+                const c = categories.find((x) => x.id === value);
+                return c?.label ?? value;
+              }}
+            </SelectValue>
           </SelectTrigger>
           <SelectContent>
             {categories.map((c) => (
@@ -409,7 +414,13 @@ export function LifecycleFields({
           onValueChange={(v) => update("groupId", !v || v === "none" ? "" : v)}
         >
           <SelectTrigger>
-            <SelectValue placeholder="No group" />
+            <SelectValue placeholder="No group">
+              {(value: string) => {
+                if (!value || value === "none") return "No group";
+                const g = groups.find((x) => x.id === value);
+                return g?.name ?? "No group";
+              }}
+            </SelectValue>
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="none">No group</SelectItem>

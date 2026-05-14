@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { createDevice, listDevices } from "@/lib/store";
+import { ensureResellerByName } from "@/lib/resellers-store";
 import { DeviceInputSchema } from "@/lib/types";
 
 export async function GET() {
@@ -23,5 +24,8 @@ export async function POST(req: Request) {
     );
   }
   const device = await createDevice(parsed.data);
+  if (device.purchaseLocation) {
+    await ensureResellerByName(device.purchaseLocation);
+  }
   return NextResponse.json(device, { status: 201 });
 }

@@ -66,6 +66,23 @@ export async function createReseller(input: ResellerInput): Promise<Reseller> {
   return reseller;
 }
 
+/**
+ * Insert a reseller for `name` if one doesn't already exist (case-insensitive
+ * match). Used when a device form's purchase location names a shop we don't
+ * track yet — keeps /resellers and the datalist autocomplete in sync without
+ * forcing users to register every shop manually.
+ */
+export async function ensureResellerByName(name: string): Promise<void> {
+  const trimmed = name.trim();
+  if (!trimmed) return;
+  const existing = await listResellers();
+  const match = existing.find(
+    (r) => r.name.trim().toLowerCase() === trimmed.toLowerCase(),
+  );
+  if (match) return;
+  await createReseller({ name: trimmed, url: "", notes: null });
+}
+
 export async function deleteReseller(id: string): Promise<boolean> {
   const { error, count } = await supabase
     .from("resellers")

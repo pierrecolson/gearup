@@ -91,9 +91,10 @@ export type GroupInput = z.infer<typeof GroupInputSchema>;
 export const ResellerSchema = z.object({
   id: z.string().min(1),
   name: z.string().min(1),
-  // Stored verbatim; we only validate that it's a non-empty string. The form
-  // normalizes "amazon.com" → "https://amazon.com" before submission.
-  url: z.string().min(1),
+  // Stored verbatim. Empty when the reseller was auto-created from a device's
+  // purchase location (the user can still add a URL later from /resellers).
+  // The manual-creation dialog normalizes "amazon.com" → "https://amazon.com".
+  url: z.string(),
   notes: z.string().nullable(),
   createdAt: z.string(),
   updatedAt: z.string(),
