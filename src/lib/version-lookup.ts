@@ -36,13 +36,28 @@ const TTL_MS = 30 * 24 * 60 * 60 * 1000;
 const DEFAULT_MODEL = "openai/gpt-5-mini";
 // Bump when prompt / data shape changes so stale cached AI responses get
 // re-fetched. Manual edits keep their entries regardless.
-const CACHE_SCHEMA = 2;
+const CACHE_SCHEMA = 3;
 
 function slug(s: string): string {
-  return s
+  return normalizeFamily(s)
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-|-$/g, "");
+}
+
+/**
+ * Normalize a model family name so common variants land in the same cache slot
+ * and the LLM receives a clean canonical string. Strips trailing size suffixes
+ * like "14 inch", "13"", "27-inch", removes generation/year noise, collapses
+ * whitespace.
+ */
+function normalizeFamily(s: string): string {
+  return s
+    .trim()
+    // Strip various inch markers: "14 inch", "14-inch", "14in", '14"'
+    .replace(/(\d+(?:\.\d+)?)\s*(?:inches?\b|inch\b|in\b|["”″])/gi, "$1")
+    .replace(/\s+/g, " ")
+    .trim();
 }
 
 export type CacheRecord = {
@@ -83,9 +98,11 @@ const SYSTEM_PROMPT = `You catalog consumer-electronics product releases.
 
 Given a product family name, list every major release in chronological order. Each release must be a real, shipping product — not concepts, prototypes, or rumors. Use the canonical product name as shipped by the manufacturer (e.g. "iPhone 15 Pro", "Sony α7 IV", "MacBook Pro 14 M3").
 
+Be forgiving with the family name. Users often write loose forms ("MacBook Pro 14", "macbook pro 14 inch", "MBP 14") — interpret them as the manufacturer's product line. If the family is ambiguous, prefer the most prominent interpretation. Never return an empty list when a well-known product line is clearly referenced.
+
 For releasedOn, return an ISO 8601 date string (YYYY-MM-DD). Use the first day of the month if only the month is known; the first day of the year if only the year is known. Return null only when the release date is genuinely unknown.
 
-Web search results are available — use them to include releases that have shipped since your training cutoff. Do not include products that are only announced or rumored but not yet shipping. Do not invent products. If the family is ambiguous, prefer the most prominent interpretation.`;
+Web search results are available — use them to include releases that have shipped since your training cutoff. Do not include products that are only announced or rumored but not yet shipping. Do not invent products.`;
 
 let _client: OpenAI | null = null;
 function getClient(): OpenAI | null {
@@ -192,7 +209,7 @@ export async function lookupReleases(
   source: "ai" | "manual" | "empty";
   configured: boolean;
 }> {
-  const family_ = family.trim();
+  const family_ = normalizeFamily(family);
   if (!family_) {
     return { entries: [], cached: false, source: "empty", configured: false };
   }
@@ -233,7 +250,7 @@ export async function setManualReleases(
   entries: VersionEntry[],
 ): Promise<void> {
   await writeCache({
-    family: family.trim(),
+    family: normalizeFamily(family),
     fetchedAt: new Date().toISOString(),
     source: "manual",
     entries,

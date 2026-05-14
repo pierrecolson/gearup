@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { deleteDevice, getDevice, updateDevice } from "@/lib/store";
+import { ensureResellerByName } from "@/lib/resellers-store";
 import { DeviceInputSchema } from "@/lib/types";
 
 type Ctx = { params: Promise<{ id: string }> };
@@ -29,6 +30,9 @@ export async function PATCH(req: Request, { params }: Ctx) {
   }
   const updated = await updateDevice(id, parsed.data);
   if (!updated) return NextResponse.json({ error: "Not found" }, { status: 404 });
+  if (updated.purchaseLocation) {
+    await ensureResellerByName(updated.purchaseLocation);
+  }
   return NextResponse.json(updated);
 }
 

@@ -5,6 +5,7 @@ import { formatMoney } from "@/lib/currency-format";
 import { PageHeader } from "@/components/page-header";
 import { DeviceCard } from "@/components/devices/device-card";
 import { DeleteGroupButton } from "@/components/groups/delete-group-button";
+import { AddDeviceToGroupCard } from "@/components/groups/add-device-to-group-card";
 
 type Ctx = { params: Promise<{ id: string }> };
 
@@ -14,6 +15,9 @@ export default async function GroupDetailPage({ params }: Ctx) {
   if (!group) notFound();
   const [devices, settings] = await Promise.all([listDevices(), getSettings()]);
   const members = devices.filter((d) => d.groupId === id);
+  const candidates = devices.filter(
+    (d) => d.groupId !== id && d.status !== "wishlist",
+  );
   const total = members.reduce(
     (s, m) => s + (m.pricePaidBaseSnapshot ?? 0),
     0,
@@ -42,17 +46,12 @@ export default async function GroupDetailPage({ params }: Ctx) {
         description={group.notes ?? undefined}
         actions={<DeleteGroupButton id={group.id} name={group.name} />}
       />
-      {members.length === 0 ? (
-        <div className="rounded-xl border border-dashed border-border p-12 text-center text-sm text-muted-foreground">
-          No devices in this group yet. Edit a device and assign it to this group.
-        </div>
-      ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-          {members.map((d) => (
-            <DeviceCard key={d.id} device={d} />
-          ))}
-        </div>
-      )}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+        {members.map((d) => (
+          <DeviceCard key={d.id} device={d} />
+        ))}
+        <AddDeviceToGroupCard groupId={group.id} candidates={candidates} />
+      </div>
     </div>
   );
 }
