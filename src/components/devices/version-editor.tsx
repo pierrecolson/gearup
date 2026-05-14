@@ -221,21 +221,21 @@ export function VersionEditor({
         </>
       )}
 
-      <form onSubmit={handleAdd} className="flex gap-2">
+      <form onSubmit={handleAdd} className="flex items-center gap-2">
         <Input
           value={draftName}
           onChange={(e) => setDraftName(e.target.value)}
           placeholder="e.g. MacBook Pro 14 M4"
           className="flex-1"
         />
-        <div className="w-44">
-          <DatePicker
-            value={draftDate || null}
-            onChange={(v) => setDraftDate(v ?? "")}
-            placeholder="Release date"
-          />
-        </div>
-        <Button type="submit" size="sm" variant="outline" disabled={saving}>
+        <DatePicker
+          value={draftDate || null}
+          onChange={(v) => setDraftDate(v ?? "")}
+          placeholder="Release date"
+          className="w-32"
+          precisions={["day", "month", "year"]}
+        />
+        <Button type="submit" variant="outline" disabled={saving}>
           <Plus className="size-4" />
           Add
         </Button>

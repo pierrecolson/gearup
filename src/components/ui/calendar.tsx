@@ -18,15 +18,15 @@ export function Calendar({
       showOutsideDays={showOutsideDays}
       className={cn("p-2", className)}
       classNames={{
-        months: "flex flex-col gap-3",
+        months: "relative flex flex-col gap-3",
         month: "space-y-3",
-        month_caption: "flex justify-center items-center h-8 relative",
+        month_caption: "flex justify-center items-center h-8",
         caption_label: "text-sm font-medium",
-        nav: "flex items-center gap-1 absolute inset-x-0 top-0 justify-between px-1",
+        nav: "absolute inset-x-0 top-0 z-10 flex h-8 items-center justify-between gap-1 px-1",
         button_previous:
-          "inline-flex items-center justify-center size-7 rounded-md hover:bg-accent text-muted-foreground hover:text-foreground transition-colors",
+          "inline-flex items-center justify-center size-7 rounded-md hover:bg-accent text-muted-foreground hover:text-foreground transition-colors cursor-pointer",
         button_next:
-          "inline-flex items-center justify-center size-7 rounded-md hover:bg-accent text-muted-foreground hover:text-foreground transition-colors",
+          "inline-flex items-center justify-center size-7 rounded-md hover:bg-accent text-muted-foreground hover:text-foreground transition-colors cursor-pointer",
         month_grid: "w-full border-collapse",
         weekdays: "flex",
         weekday:

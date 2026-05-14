@@ -1,5 +1,6 @@
 "use client";
 
+import * as React from "react";
 import { CircleNotch, UploadSimple, X } from "@phosphor-icons/react/ssr";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -257,6 +258,7 @@ export function PurchaseFields({
           value={state.purchaseDate || null}
           onChange={(v) => update("purchaseDate", v ?? "")}
           placeholder="Pick the day you bought it"
+          precisions={["day", "month"]}
         />
       </Field>
       <Field
@@ -311,13 +313,9 @@ export function PurchaseFields({
         </div>
       </Field>
       <Field label="Warranty (months)">
-        <Input
-          type="number"
-          inputMode="numeric"
+        <WarrantyMonthsInput
           value={state.warrantyMonths}
-          onChange={(e) => update("warrantyMonths", e.target.value)}
-          placeholder="12"
-          min="0"
+          onChange={(v) => update("warrantyMonths", v)}
         />
       </Field>
       <Field label="Receipt number">
@@ -402,6 +400,7 @@ export function LifecycleFields({
           value={state.expectedRenewalDate || null}
           onChange={(v) => update("expectedRenewalDate", v ?? "")}
           placeholder="No renewal target"
+          precisions={["day", "month", "year"]}
         />
       </Field>
       <Field label="Group">
@@ -455,6 +454,61 @@ export function LifecycleFields({
         </Field>
       )}
     </>
+  );
+}
+
+const WARRANTY_PRESETS = ["6", "12", "24", "36", "48"] as const;
+
+function WarrantyMonthsInput({
+  value,
+  onChange,
+}: {
+  value: string;
+  onChange: (next: string) => void;
+}) {
+  const isPreset = (WARRANTY_PRESETS as readonly string[]).includes(value);
+  const [custom, setCustom] = React.useState(value === "" || isPreset ? false : true);
+  const select = value === "" ? "" : custom ? "custom" : value;
+
+  return (
+    <div className="flex gap-2">
+      <Select
+        value={select}
+        onValueChange={(v) => {
+          if (!v) return;
+          if (v === "custom") {
+            setCustom(true);
+            return;
+          }
+          setCustom(false);
+          onChange(v);
+        }}
+      >
+        <SelectTrigger className={custom ? "w-28" : "flex-1"}>
+          <SelectValue placeholder="Pick a duration" />
+        </SelectTrigger>
+        <SelectContent>
+          {WARRANTY_PRESETS.map((m) => (
+            <SelectItem key={m} value={m}>
+              {m} months
+            </SelectItem>
+          ))}
+          <SelectItem value="custom">Custom…</SelectItem>
+        </SelectContent>
+      </Select>
+      {custom && (
+        <Input
+          type="number"
+          inputMode="numeric"
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          placeholder="Months"
+          min="0"
+          className="flex-1"
+          autoFocus
+        />
+      )}
+    </div>
   );
 }
 
